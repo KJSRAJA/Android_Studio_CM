@@ -3,6 +3,7 @@ package com.example.cim
 import android.Manifest
 import android.app.DatePickerDialog
 import android.content.pm.PackageManager
+import android.location.Geocoder
 import android.os.Bundle
 import android.telephony.SmsManager
 import android.text.Editable
@@ -10,30 +11,33 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.Spinner
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.textfield.TextInputEditText
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import java.util.UUID
+import java.util.*
 
 class DailyEntryFragment : Fragment() {
 
     private var selectedDate: Date = Date()
     private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    
+    private var currentLatitude: Double? = null
+    private var currentLongitude: Double? = null
+    private var currentAddress: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         val view = inflater.inflate(R.layout.fragment_daily_entry, container, false)
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
         val spinnerAgent = view.findViewById<Spinner>(R.id.spinnerAgent)
         val btnPickDate = view.findViewById<Button>(R.id.btnPickDate)
@@ -43,6 +47,7 @@ class DailyEntryFragment : Fragment() {
         val tvSold = view.findViewById<TextView>(R.id.tvSold)
         val tvPayable = view.findViewById<TextView>(R.id.tvPayable)
         val tvCommission = view.findViewById<TextView>(R.id.tvCommission)
+        val tvLocation = view.findViewById<TextView>(R.id.tvLocation)
         val btnSaveEntry = view.findViewById<Button>(R.id.btnSaveEntry)
 
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, DataRepository.agents)
@@ -58,6 +63,8 @@ class DailyEntryFragment : Fragment() {
                 tvSelectedDate.text = dateFormat.format(selectedDate)
             }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
         }
+
+        getLocation(tvLocation)
 
         val calculationWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -106,11 +113,20 @@ class DailyEntryFragment : Fragment() {
                 taken,
                 returned,
                 DataRepository.COMPANY_PRICE,
-                DataRepository.SELLING_PRICE
+                DataRepository.SELLING_PRICE,
+                locationName = currentAddress,
+                latitude = currentLatitude,
+                longitude = currentLongitude
             )
 
             DataRepository.transactions.add(transaction)
-            Toast.makeText(context, "Entry Saved!", Toast.LENGTH_SHORT).show()
+            
+            // Check area match for warning but allow saving
+            if (currentAddress != null && !currentAddress!!.contains(agent.area, ignoreCase = true)) {
+                Toast.makeText(context, "Entry Saved. Warning: Outside ${agent.area}!", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "Entry Saved!", Toast.LENGTH_SHORT).show()
+            }
             
             sendSmsNotification(transaction)
             
@@ -121,14 +137,45 @@ class DailyEntryFragment : Fragment() {
         return view
     }
 
-    private fun sendSmsNotification(transaction: DailyTransaction) {
-        var contact = transaction.agent.contact
-        if (contact.isNullOrEmpty()) {
-            Toast.makeText(context, "No contact number for agent. SMS not sent.", Toast.LENGTH_SHORT).show()
+    private fun getLocation(tvLocation: TextView) {
+        if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 102)
             return
         }
 
-        // Clean and format for Indian numbers
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                currentLatitude = location.latitude
+                currentLongitude = location.longitude
+                
+                try {
+                    val geocoder = Geocoder(requireContext(), Locale.getDefault())
+                    val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                    if (!addresses.isNullOrEmpty()) {
+                        val address = addresses[0]
+                        currentAddress = address.getAddressLine(0) ?: "Unknown Location"
+                        tvLocation.text = "Location: $currentAddress"
+                    } else {
+                        tvLocation.text = "Location: Lat ${location.latitude}, Lon ${location.longitude}"
+                    }
+                } catch (e: Exception) {
+                    tvLocation.text = "Location: Lat ${location.latitude}, Lon ${location.longitude}"
+                }
+            } else {
+                tvLocation.text = "Location: Unable to detect"
+            }
+        }.addOnFailureListener {
+            tvLocation.text = "Location Error: ${it.message}"
+        }
+    }
+
+    private fun sendSmsNotification(transaction: DailyTransaction) {
+        var contact = transaction.agent.contact
+        if (contact.isNullOrEmpty()) {
+            Toast.makeText(context, "SMS skip: No contact", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val cleanContact = contact.replace("\\s".toRegex(), "").replace("-", "")
         if (cleanContact.length == 10 && cleanContact.all { it.isDigit() }) {
             contact = "+91$cleanContact"
@@ -143,13 +190,12 @@ class DailyEntryFragment : Fragment() {
             val smsManager: SmsManager = requireContext().getSystemService(SmsManager::class.java)
             val message = "You have taken ${transaction.taken} papers on ${dateFormat.format(transaction.date)}. Sold: ${transaction.sold}. Amount payable: ₹${String.format("%.2f", transaction.payableAmount)}."
             
-            // Use sendMultipartTextMessage for longer messages and reliability
             val parts = smsManager.divideMessage(message)
             smsManager.sendMultipartTextMessage(contact, null, parts, null, null)
             
             Toast.makeText(context, "SMS sent to $contact", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed to send SMS: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "SMS Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }

@@ -19,7 +19,10 @@ data class DailyTransaction(
     val returned: Int,
     val companyPrice: Double,
     val sellingPrice: Double,
-    var isPaid: Boolean = false
+    var isPaid: Boolean = false,
+    val locationName: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 ) {
     val sold: Int get() = taken - returned
     val payableAmount: Double get() = sold * companyPrice
