@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_agents"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="Agents" />
+    <item
+        android:id="@+id/nav_daily_entry"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Daily Entry" />
+    <item
+        android:id="@+id/nav_payments"
+        android:icon="@android:drawable/ic_menu_recent_history"
+        android:title="Payments" />
+</menu>
