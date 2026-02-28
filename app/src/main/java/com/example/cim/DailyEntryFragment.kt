@@ -1,7 +1,10 @@
 package com.example.cim
 
+import android.Manifest
 import android.app.DatePickerDialog
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.telephony.SmsManager
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -12,6 +15,7 @@ import android.widget.Button
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.textfield.TextInputEditText
 import java.text.SimpleDateFormat
@@ -41,12 +45,10 @@ class DailyEntryFragment : Fragment() {
         val tvCommission = view.findViewById<TextView>(R.id.tvCommission)
         val btnSaveEntry = view.findViewById<Button>(R.id.btnSaveEntry)
 
-        // Setup Spinner
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, DataRepository.agents)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerAgent.adapter = adapter
 
-        // Setup Date Picker
         tvSelectedDate.text = dateFormat.format(selectedDate)
         btnPickDate.setOnClickListener {
             val calendar = Calendar.getInstance()
@@ -110,11 +112,44 @@ class DailyEntryFragment : Fragment() {
             DataRepository.transactions.add(transaction)
             Toast.makeText(context, "Entry Saved!", Toast.LENGTH_SHORT).show()
             
-            // Clear inputs
+            sendSmsNotification(transaction)
+            
             etTaken.text?.clear()
             etReturned.text?.clear()
         }
 
         return view
+    }
+
+    private fun sendSmsNotification(transaction: DailyTransaction) {
+        var contact = transaction.agent.contact
+        if (contact.isNullOrEmpty()) {
+            Toast.makeText(context, "No contact number for agent. SMS not sent.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Clean and format for Indian numbers
+        val cleanContact = contact.replace("\\s".toRegex(), "").replace("-", "")
+        if (cleanContact.length == 10 && cleanContact.all { it.isDigit() }) {
+            contact = "+91$cleanContact"
+        }
+
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.SEND_SMS), 101)
+            return
+        }
+
+        try {
+            val smsManager: SmsManager = requireContext().getSystemService(SmsManager::class.java)
+            val message = "You have taken ${transaction.taken} papers on ${dateFormat.format(transaction.date)}. Sold: ${transaction.sold}. Amount payable: ₹${String.format("%.2f", transaction.payableAmount)}."
+            
+            // Use sendMultipartTextMessage for longer messages and reliability
+            val parts = smsManager.divideMessage(message)
+            smsManager.sendMultipartTextMessage(contact, null, parts, null, null)
+            
+            Toast.makeText(context, "SMS sent to $contact", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to send SMS: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 }
