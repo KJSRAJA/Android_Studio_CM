@@ -56,6 +56,7 @@ class DailyEntryFragment : Fragment() {
 
         tvSelectedDate.text = dateFormat.format(selectedDate)
         btnPickDate.setOnClickListener {
+            SoundUtil.playClickSound(context, it)
             val calendar = Calendar.getInstance()
             DatePickerDialog(requireContext(), { _, year, month, dayOfMonth ->
                 calendar.set(year, month, dayOfMonth)
@@ -92,6 +93,7 @@ class DailyEntryFragment : Fragment() {
         etReturned.addTextChangedListener(calculationWatcher)
 
         btnSaveEntry.setOnClickListener {
+            SoundUtil.playClickSound(context, it)
             val agent = spinnerAgent.selectedItem as? Agent
             val taken = etTaken.text.toString().toIntOrNull() ?: 0
             val returned = etReturned.text.toString().toIntOrNull() ?: 0
@@ -121,7 +123,6 @@ class DailyEntryFragment : Fragment() {
 
             DataRepository.transactions.add(transaction)
             
-            // Check area match for warning but allow saving
             if (currentAddress != null && !currentAddress!!.contains(agent.area, ignoreCase = true)) {
                 Toast.makeText(context, "Entry Saved. Warning: Outside ${agent.area}!", Toast.LENGTH_LONG).show()
             } else {

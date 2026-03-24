@@ -17,20 +17,21 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Request Notification Permission for Android 13+
+        DataRepository.init(this)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 103)
             }
         }
 
-        // Start the background monitoring service
         val intent = Intent(this, MonitoringService::class.java)
         startService(intent)
 
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
 
         bottomNavigation.setOnItemSelectedListener { item ->
+            SoundUtil.playClickSound(this)
             when (item.itemId) {
                 R.id.nav_agents -> {
                     loadFragment(AgentsFragment())
@@ -48,7 +49,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Load default fragment
         if (savedInstanceState == null) {
             bottomNavigation.selectedItemId = R.id.nav_agents
         }
@@ -58,5 +58,15 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.nav_host_fragment, fragment)
             .commit()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        DataRepository.save(this)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        DataRepository.save(this)
     }
 }

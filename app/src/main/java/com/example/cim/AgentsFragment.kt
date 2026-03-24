@@ -25,12 +25,14 @@ class AgentsFragment : Fragment() {
         val fabAddAgent = view.findViewById<FloatingActionButton>(R.id.fabAddAgent)
 
         adapter = AgentAdapter(DataRepository.agents) { agent ->
+            SoundUtil.playClickSound(context)
             DataRepository.agents.remove(agent)
             adapter.updateData(ArrayList(DataRepository.agents))
         }
         rvAgents.adapter = adapter
 
         fabAddAgent.setOnClickListener {
+            SoundUtil.playClickSound(context, it)
             showAddAgentDialog()
         }
 
@@ -47,6 +49,7 @@ class AgentsFragment : Fragment() {
             .setTitle("Add New Agent")
             .setView(dialogView)
             .setPositiveButton("Add") { _, _ ->
+                SoundUtil.playClickSound(context)
                 val name = etName.text.toString()
                 val area = etArea.text.toString()
                 val contact = etContact.text.toString()
@@ -57,7 +60,9 @@ class AgentsFragment : Fragment() {
                     adapter.updateData(ArrayList(DataRepository.agents))
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton("Cancel") { _, _ ->
+                SoundUtil.playClickSound(context)
+            }
             .show()
     }
 }

@@ -1,7 +1,18 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.CiM" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+    <style name="Base.Theme.CiM" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/primaryRed</item>
+        <item name="colorPrimaryVariant">@color/primaryVariantRed</item>
+        <item name="colorOnPrimary">@color/onPrimaryWhite</item>
+
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/secondaryWhite</item>
+        <item name="colorOnSecondary">@color/onBackgroundBlack</item>
+
+        <!-- Background and Surface colors -->
+        <item name="android:windowBackground">@color/backgroundWhite</item>
+        <item name="colorSurface">@color/surfaceWhite</item>
+        <item name="colorOnSurface">@color/onSurfaceBlack</item>
     </style>
 </resources>
